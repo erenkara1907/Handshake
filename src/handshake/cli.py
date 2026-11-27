@@ -22,7 +22,17 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 DEFAULT_OUT = Path("runs.jsonl")
 DEFAULT_SCENARIOS = 12
 DEFAULT_REPEATS = 3
-TABLE_HEADER = ("model", "role", "n", "deal_rate", "leak_rate", "missed", "surplus_share")
+TABLE_HEADER = (
+    "model",
+    "role",
+    "n",
+    "feasible_n",
+    "deal_rate(feasible)",
+    "leak_rate",
+    "giveaway_rate",
+    "missed(feasible)",
+    "surplus_share",
+)
 
 
 def _fail(message: str) -> typer.Exit:
@@ -77,8 +87,10 @@ def _row(group: GroupStats) -> tuple[str, ...]:
         group.model,
         group.role.value,
         str(group.n),
+        str(group.feasible_n),
         _interval(group.deal_rate, group.deal_rate_ci),
         _interval(group.leak_rate, group.leak_rate_ci),
+        _interval(group.giveaway_rate, group.giveaway_rate_ci),
         f"{group.missed_deal_rate:.2f}",
         surplus,
     )

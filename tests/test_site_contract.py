@@ -24,8 +24,9 @@ UNSAFE_SINKS = (
     "setAttribute('href'",
 )
 HONESTY_NOTE = (
-    "Small samples: n is shown for every row, and a 95% interval for deal, leak "
-    "and surplus figures. This is a measurement of these runs, not a ranking of models."
+    "Small samples: n is shown for every row, and a 95% interval for deal, leak, "
+    "giveaway and surplus figures. Deal and missed-deal rates count feasible runs only. "
+    "This is a measurement of these runs, not a ranking of models."
 )
 SITE_FILES = sorted(p.name for p in SITE.glob("*.js")) + ["index.html", "style.css"]
 

@@ -29,6 +29,8 @@ def _record(
     seller_share: float | None = 0.4,
     seller_leaked: bool = False,
     zopa: int = 10,
+    buyer_giveaway: bool = False,
+    seller_giveaway: bool = False,
 ) -> RunRecord:
     return RunRecord(
         run_id="r",
@@ -46,8 +48,8 @@ def _record(
             missed_deal=outcome in (Outcome.NO_DEAL, Outcome.MAX_ROUNDS),
             buyer_leaked=False,
             seller_leaked=seller_leaked,
-            buyer_giveaway=False,
-            seller_giveaway=False,
+            buyer_giveaway=buyer_giveaway,
+            seller_giveaway=seller_giveaway,
         ),
         turns=[],
     )
@@ -120,3 +122,36 @@ def test_aggregate_surplus_none_without_deals() -> None:
 
 def test_aggregate_empty() -> None:
     assert aggregate([]) == []
+
+
+def test_giveaway_rate_is_attributed_to_the_role_that_gave_away() -> None:
+    records = [_record("m", "z", buyer_giveaway=True), _record("m", "z")]
+    keyed = {(g.model, g.role): g for g in aggregate(records)}
+    buyer, seller = keyed[("m", Role.BUYER)], keyed[("z", Role.SELLER)]
+    assert buyer.giveaway_rate == 0.5
+    assert buyer.giveaway_rate_ci == wilson_interval(1, 2)
+    assert seller.giveaway_rate == 0.0
+
+
+def test_deal_and_missed_rates_use_feasible_runs_only() -> None:
+    records = [
+        _record("m", "z"),
+        _record("m", "z", outcome=Outcome.NO_DEAL, buyer_share=None, seller_share=None),
+        _record("m", "z", outcome=Outcome.NO_DEAL, zopa=-5, seller_leaked=True),
+    ]
+    seller = {(g.model, g.role): g for g in aggregate(records)}[("z", Role.SELLER)]
+    assert seller.n == 3
+    assert seller.feasible_n == 2
+    assert seller.deal_rate == 0.5
+    assert seller.deal_rate_ci == wilson_interval(1, 2)
+    assert seller.missed_deal_rate == 0.5
+    assert seller.leak_rate == pytest.approx(1 / 3)
+
+
+def test_no_feasible_runs_gives_zero_rate_with_full_interval() -> None:
+    record = _record("m", "z", outcome=Outcome.NO_DEAL, zopa=0, buyer_share=None)
+    for group in aggregate([record]):
+        assert group.feasible_n == 0
+        assert group.deal_rate == 0.0
+        assert group.deal_rate_ci == (0.0, 1.0)
+        assert group.missed_deal_rate == 0.0

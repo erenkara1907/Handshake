@@ -4,10 +4,12 @@ import { state } from "./state.js";
 const COLUMNS = [
   { key: "model", label: "Model", numeric: false },
   { key: "role", label: "Role", numeric: false },
-  { key: "n", label: "n", numeric: true },
-  { key: "deal_rate", ci: "deal_rate_ci", label: "Deal rate", numeric: true },
-  { key: "leak_rate", ci: "leak_rate_ci", label: "Leak rate", numeric: true },
-  { key: "missed_deal_rate", label: "Missed-deal rate", numeric: true },
+  { key: "n", label: "n (all runs)", numeric: true, count: true },
+  { key: "feasible_n", label: "Feasible n (ZOPA > 0)", numeric: true, count: true },
+  { key: "deal_rate", ci: "deal_rate_ci", label: "Deal rate (feasible)", numeric: true },
+  { key: "leak_rate", ci: "leak_rate_ci", label: "Leak rate (all)", numeric: true },
+  { key: "giveaway_rate", ci: "giveaway_rate_ci", label: "Giveaway rate (all)", numeric: true },
+  { key: "missed_deal_rate", label: "Missed-deal rate (feasible)", numeric: true },
   { key: "mean_surplus_share", ci: "surplus_ci", label: "Mean surplus share", numeric: true },
 ];
 
@@ -75,7 +77,7 @@ function groupRow(group) {
   const row = el("tr");
   COLUMNS.forEach((col) => {
     if (col.key === "model" || col.key === "role") row.append(el("td", "", group[col.key]));
-    else if (col.key === "n") row.append(el("td", "num", group.n));
+    else if (col.count) row.append(el("td", "num", group[col.key]));
     else row.append(rateCell(group, col));
   });
   return row;

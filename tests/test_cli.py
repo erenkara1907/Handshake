@@ -75,6 +75,26 @@ def test_report_prints_each_model_role_with_n(runs_file: Path) -> None:
     assert any(line.split()[:3] == ["b", "seller", "2"] for line in lines)
 
 
+def test_report_table_has_giveaway_and_feasible_columns(runs_file: Path) -> None:
+    result = runner.invoke(app, ["report", str(runs_file)])
+
+    header, *rows = result.stdout.splitlines()
+    assert header.split() == [
+        "model",
+        "role",
+        "n",
+        "feasible_n",
+        "deal_rate(feasible)",
+        "leak_rate",
+        "giveaway_rate",
+        "missed(feasible)",
+        "surplus_share",
+    ]
+    buyer = next(row for row in rows if row.split()[:2] == ["a", "buyer"])
+    assert buyer.split()[2:4] == ["2", "2"]
+    assert buyer.count("[") == 4
+
+
 def test_report_json_out_has_groups_key(runs_file: Path, tmp_path: Path) -> None:
     out = tmp_path / "nested" / "report.json"
 
