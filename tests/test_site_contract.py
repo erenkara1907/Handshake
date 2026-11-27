@@ -128,6 +128,31 @@ def test_index_html_has_honesty_note() -> None:
     assert HONESTY_NOTE in (SITE / "index.html").read_text(encoding="utf-8")
 
 
+def test_index_html_explains_how_to_start_without_javascript() -> None:
+    # Opened from disk (file://), the ES module is blocked and no script runs, so the static
+    # HTML itself must say what to do instead of showing an empty page.
+    html = (SITE / "index.html").read_text(encoding="utf-8")
+    opening_tag = html.split('id="boot-note"', 1)[0].rsplit("<div", 1)[-1]
+    note = html.split('id="boot-note"', 1)[1].split("</div>", 1)[0]
+
+    assert "uv run handshake serve runs.jsonl" in note
+    assert "hidden" not in opening_tag
+
+
+def test_table_headers_keep_words_whole() -> None:
+    # body uses overflow-wrap:anywhere; without this override narrow numeric columns collapse
+    # to one letter per line.
+    css = (SITE / "style.css").read_text(encoding="utf-8")
+    rule = re.search(r"^th \{[^}]*\}", css, re.MULTILINE)
+
+    assert rule is not None
+    assert "overflow-wrap: normal" in rule.group(0)
+
+
+def test_app_hides_the_boot_note_once_it_runs() -> None:
+    assert '$("boot-note").hidden = true' in APP_JS.read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize("button_id", ["b-prev", "b-next", "b-reset"])
 def test_player_controls_refuse_when_aria_disabled(button_id: str) -> None:
     source = (SITE / "player.js").read_text(encoding="utf-8")

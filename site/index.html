@@ -15,6 +15,10 @@
 </header>
 
 <main>
+  <div id="boot-note" class="status" role="alert">
+    <p><strong>No data is showing yet.</strong> This page needs a small web server and a results file. If this message stays, the file was opened straight from disk or JavaScript is off.</p>
+    <p>In the project folder run <code>uv run handshake serve runs.jsonl</code>. It builds the data, starts the server and opens this page for you.</p>
+  </div>
   <div id="status" class="status" role="status" hidden></div>
 
   <section aria-labelledby="h-board">
@@ -59,7 +63,7 @@
 </main>
 
 <footer>
-  <p>This page loads <code>data/summary.json</code> and <code>data/runs.jsonl</code> with <code>fetch</code>, which does not work from a <code>file://</code> address. Serve the folder over http, for example <code>python3 -m http.server -d site</code>, then open the printed address.</p>
+  <p>This page loads <code>data/summary.json</code> and <code>data/runs.jsonl</code> with <code>fetch</code>, which does not work from a <code>file://</code> address. The easy way is <code>uv run handshake serve runs.jsonl</code>; by hand, serve the folder over http, for example <code>python3 -m http.server -d site</code>, then open the printed address.</p>
   <p>All text from the runs is untrusted model output and is shown as plain text.</p>
 </footer>
 <script type="module" src="app.js"></script>

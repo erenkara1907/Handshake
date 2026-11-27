@@ -42,6 +42,7 @@ async function loadRuns(problems) {
 }
 
 async function main() {
+  $("boot-note").hidden = true;
   wirePlayer();
   wireFilters();
   initHead();
@@ -50,7 +51,7 @@ async function main() {
   let scenarios = await loadSummary(problems);
   await loadRuns(problems);
   if (problems.length > 0) {
-    showStatus(problems.join(" ") + " Generate them with the report command (--json-out) and copy runs.jsonl into site/data/, and serve over http.");
+    showStatus(problems.join(" ") + " Start this page with: uv run handshake serve runs.jsonl");
   } else if (state.runs.length === 0) {
     showStatus("data/runs.jsonl contains no runs.");
   }

@@ -61,7 +61,9 @@ th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--li
 tbody tr:last-child td { border-bottom: 0; }
 td { white-space: nowrap; }
 td.num, th.num { text-align: right; }
-th { padding: 0; font-weight: 600; font-size: .85rem; }
+/* body wraps "anywhere" for long model text; headers must keep words whole or narrow
+   numeric columns collapse to one letter per line. */
+th { padding: 0; font-weight: 600; font-size: .85rem; overflow-wrap: normal; }
 th button {
   all: unset; box-sizing: border-box; display: block; width: 100%; padding: 10px 12px;
   cursor: pointer; color: var(--muted); text-align: inherit;
