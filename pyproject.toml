@@ -11,6 +11,7 @@ dependencies = [
     "typer",
     "httpx",
     "uvicorn",
+    "litellm>=1.111.0",
 ]
 
 [dependency-groups]
@@ -33,6 +34,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 addopts = "-m 'not smoke' --cov=handshake --cov-fail-under=80"
+filterwarnings = [
+    "ignore:.*\\[EXPERIMENTAL\\].*:UserWarning",
+    "ignore:BaseAgentConfig is deprecated:DeprecationWarning",
+]
 markers = ["smoke: live-LLM smoke tests, excluded by default"]
 
 [tool.ruff]
