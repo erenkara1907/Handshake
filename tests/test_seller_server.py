@@ -20,20 +20,20 @@ SCENARIO = Scenario(
 CARD_PATH = "/.well-known/agent-card.json"
 
 
-def _rpc(text: str, context_id: str = "c1") -> dict:
+def _rpc(text: str, context_id: str | None = "c1") -> dict:
+    message = {
+        "kind": "message",
+        "messageId": f"m-{text}",
+        "role": "user",
+        "parts": [{"kind": "text", "text": text}],
+    }
+    if context_id is not None:
+        message["contextId"] = context_id
     return {
         "jsonrpc": "2.0",
         "id": "1",
         "method": "message/send",
-        "params": {
-            "message": {
-                "kind": "message",
-                "messageId": f"m-{text}",
-                "role": "user",
-                "contextId": context_id,
-                "parts": [{"kind": "text", "text": text}],
-            }
-        },
+        "params": {"message": message},
     }
 
 
@@ -79,6 +79,15 @@ async def test_history_kept_per_context(client) -> None:
     assert len(seen[1]) >= 3
     await http.post("/", json=_rpc("other", context_id="c2"))
     assert len(seen[2]) < len(seen[1])
+
+
+async def test_reply_context_id_carries_history_for_client_without_context(client) -> None:
+    http, seen = client
+    first = (await http.post("/", json=_rpc("first", context_id=None))).json()
+    context_id = first["result"]["contextId"]
+    assert context_id
+    await http.post("/", json=_rpc("second", context_id=context_id))
+    assert len(seen[1]) >= 3
 
 
 async def test_max_output_tokens_applied() -> None:

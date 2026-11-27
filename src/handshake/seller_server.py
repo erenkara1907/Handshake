@@ -61,12 +61,18 @@ class SellerExecutor(AgentExecutor):
         self._histories: dict[str, list[ModelMessage]] = {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        key = context.context_id or ""
+        key = context.context_id
+        if key is None:
+            raise ValueError("A2A request context has no context_id")
         result = await self._agent.run(
             context.get_user_input(), message_history=self._histories.get(key, [])
         )
         self._histories = {**self._histories, key: result.all_messages()}
-        await event_queue.enqueue_event(new_agent_text_message(result.output.model_dump_json()))
+        await event_queue.enqueue_event(
+            new_agent_text_message(
+                result.output.model_dump_json(), context_id=key, task_id=context.task_id
+            )
+        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         raise NotImplementedError
