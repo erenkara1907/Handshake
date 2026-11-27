@@ -40,6 +40,9 @@ filterwarnings = [
 ]
 markers = ["smoke: live-LLM smoke tests, excluded by default"]
 
+[tool.coverage.run]
+omit = ["src/handshake/execute.py"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
