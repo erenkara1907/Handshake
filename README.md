@@ -9,6 +9,8 @@ Two LLM agents built on different frameworks (a Google ADK buyer and a Pydantic 
 
 Not published to PyPI. Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
+<!-- PLACEHOLDER: replace <repository-url> with the real repository URL once one exists. -->
+
 ```
 git clone <repository-url> handshake
 cd handshake
@@ -34,28 +36,33 @@ python3 -m http.server -d site
 
 ## How it works
 
-An orchestrator relays turns between two agents; the agents never talk to the referee. The buyer is an ADK `LlmAgent` (model via `LiteLlm`) that reaches the seller through ADK's `RemoteA2aAgent`. The seller runs as a separate process: an a2a-sdk `AgentExecutor` wrapping a Pydantic AI agent. Every turn is a structured `Offer`. After the negotiation, a pure-Python referee decides the outcome and metrics compute surplus, missed deals and leaks; results are appended to JSONL, which the static replay site reads.
+The orchestrator holds the transcript and alternates two independent negotiators, passing each reply's raw text to the other side as its next prompt; the agents never call each other or the referee. The buyer is an ADK `LlmAgent` (model via `LiteLlm`). The seller negotiator is an ADK `RemoteA2aAgent` client that sends A2A `message/send` to a separate seller process: an a2a-sdk `AgentExecutor` running a Pydantic AI agent. Every turn is a structured `Offer` parsed by the orchestrator; when the negotiation ends, a pure-Python referee judges the finished turn list, and metrics, JSONL records and the static replay site follow.
 
 ```
-                  +------------------------------+
-                  |         orchestrator         |
-                  +------+---------------+-------+
-                         |               |
-           turn / reply  |               | transcript
-                         v               v
-  +----------------------------+   +-------------------+
-  | ADK buyer                  |   | referee (no LLM)  |
-  | LlmAgent + LiteLlm         |   | -> metrics        |
-  +-------------+--------------+   | -> runs.jsonl     |
-                | RemoteA2aAgent   | -> replay site    |
-                | (A2A, message/send)+-----------------+
-                v
-  +----------------------------+
-  | seller process             |
-  | a2a-sdk AgentExecutor      |
-  | wrapping a Pydantic AI     |
-  | agent                      |
-  +----------------------------+
+                +------------------------+
+                |      orchestrator      |
+                |  (holds the turn list) |
+                +------------------------+
+                   |                  |
+            prompt |                  | prompt
+                   v                  v
+  +--------------------------+  +--------------------------+
+  | buyer negotiator         |  | seller negotiator        |
+  | ADK LlmAgent + LiteLlm   |  | ADK RemoteA2aAgent       |
+  +--------------------------+  +--------------------------+
+                                             |
+                                             | A2A message/send
+                                             v
+                                +--------------------------+
+                                | seller process           |
+                                | a2a-sdk AgentExecutor    |
+                                | running a Pydantic AI    |
+                                | agent                    |
+                                +--------------------------+
+
+  After the last turn (agents are not involved):
+
+  orchestrator -> referee (no LLM) -> metrics -> runs.jsonl -> replay site
 ```
 
 | Concept | Values |
@@ -73,7 +80,7 @@ A deal requires `accept=true` matching the other side's last price; a deal outsi
 - **Small samples.** Results show n and 95% intervals (Wilson for rates, bootstrap for surplus means). The missed-deal rate has no interval. Nothing here is a ranking of models.
 - **`walk_away`.** It was added to `Offer` (beyond the original price, accept, message) so a no-deal is distinguishable from hitting the round cap.
 - **Leak definition.** A leak is an agent's own secret limit appearing in its own message text (the price field is excluded). The regex treats a space as a thousands separator, so `8 000 000` can false-match 8000. Giveaway (offering exactly your own limit) is reported separately from leaks.
-- **Rate limits.** The runner retries 429s with exponential backoff (2, 4, 8, 16, 32 s) on the buyer side and inside the seller process. A seller-side 429 that outlasts the seller's ladder reaches the buyer without a status code, so it is not retried buyer-side. With the CLI's per-run error handler such a run is skipped, not recorded, and retried when the same command is re-run. A sustained seller-side 429 could still appear as a `protocol_error` in the data.
+- **Rate limits.** The run executor (`execute.py`) retries 429s with exponential backoff (2, 4, 8, 16, 32 s) on the buyer-side calls, and the seller process retries inside `seller_server.py`. A seller-side 429 that outlasts the seller's ladder reaches the buyer without a status code, so it is not retried buyer-side. With the CLI's per-run error handler such a run is skipped, not recorded, and retried when the same command is re-run. A sustained seller-side 429 could still appear as a `protocol_error` in the data.
 - **Reliability.** Model replies are unbounded text except for the `max_output_tokens` cap (default 400) from the config. A small local model (the Ollama smoke run with llama3.2) often ends a negotiation as `protocol_error`, for example by accepting a price different from the one on the table. That is a legitimate measured outcome, not a harness failure.
 - **Replay site.** Vanilla JS modules, no build step, all agent text rendered with `textContent` only. Leaderboard rows are sorted by model and role by default; filters apply to the run list, not the leaderboard. Verified in headless Chrome only; browser console capture and real keyboard tab-through were not fully verified.
 - **Groq.** Free-tier limits and the model names in `handshake.example.toml` must be verified in the Groq console before a published run. Keys are read only from the `GROQ_API_KEY` environment variable.
