@@ -1,7 +1,8 @@
 import asyncio
-import json
 import logging
+import tempfile
 import tomllib
+import webbrowser
 from pathlib import Path
 from typing import Annotated
 
@@ -14,6 +15,7 @@ from handshake.execute import execute_run
 from handshake.records import read_records
 from handshake.runner import RunSpec, build_specs, run_all
 from handshake.scenarios import generate_scenarios
+from handshake.site_server import LOCAL_HOST, make_server, prepare_site, summary_json
 from handshake.stats import GroupStats, aggregate
 
 logger = logging.getLogger(__name__)
@@ -23,6 +25,7 @@ app = typer.Typer(no_args_is_help=True, add_completion=False)
 DEFAULT_OUT = Path("runs.jsonl")
 DEFAULT_SCENARIOS = 12
 DEFAULT_REPEATS = 3
+DEFAULT_PORT = 8000
 TABLE_HEADER = (
     "model",
     "role",
@@ -127,9 +130,35 @@ def report(
     for line in _format_table(rows):
         typer.echo(line)
     if json_out is not None:
-        payload = {
-            "groups": [group.model_dump(mode="json") for group in groups],
-            "scenarios": sorted({record.scenario_id for record in records}),
-        }
         json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        json_out.write_text(summary_json(records), encoding="utf-8")
+
+
+@app.command()
+def serve(
+    runs: Annotated[Path, typer.Argument(help="JSONL results file.")],
+    port: Annotated[int, typer.Option(help="Port to listen on.")] = DEFAULT_PORT,
+    open_browser: Annotated[
+        bool, typer.Option("--open/--no-open", help="Open the page in a browser.")
+    ] = True,
+) -> None:
+    """Serve the replay site for RUNS at http://127.0.0.1:PORT (Ctrl-C to stop)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            prepare_site(runs, Path(tmp))
+        except (ValueError, FileNotFoundError) as error:
+            raise _fail(str(error)) from error
+        try:
+            server = make_server(Path(tmp), port)
+        except OSError as error:
+            raise _fail(f"cannot listen on port {port}: {error}") from error
+        url = f"http://{LOCAL_HOST}:{server.server_address[1]}/"
+        typer.echo(f"serving {runs} at {url}  (Ctrl-C to stop)")
+        if open_browser:
+            webbrowser.open(url)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            typer.echo("stopped")
+        finally:
+            server.server_close()
