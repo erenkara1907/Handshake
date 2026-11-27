@@ -51,7 +51,7 @@ async def client() -> AsyncIterator[tuple[httpx.AsyncClient, list[list[ModelMess
     seen: list[list[ModelMessage]] = []
     app = build_seller_app(SCENARIO, _model(seen))
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as c:
         yield c, seen
 
@@ -100,7 +100,7 @@ async def test_max_output_tokens_applied() -> None:
 
     app = build_seller_app(SCENARIO, FunctionModel(respond), max_output_tokens=123)
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as c:
         await c.post("/", json=_rpc("hi"))
     assert seen[0].model_settings["max_tokens"] == 123
@@ -138,7 +138,7 @@ async def test_provider_429_is_retried_in_seller() -> None:
 
     app = build_seller_app(SCENARIO, FunctionModel(respond), sleep=sleep)
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as c:
         body = (await c.post("/", json=_rpc("hi"))).json()
     assert Offer.model_validate_json(body["result"]["parts"][0]["text"]).price == 600
@@ -149,8 +149,14 @@ async def test_agent_card_description_carries_run_token() -> None:
     token = "0123456789abcdef0123456789abcdef"
     app = build_seller_app(SCENARIO, _model([]), card_token=token)
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=app), base_url="http://test"
+        transport=httpx.ASGITransport(app=app), base_url="http://127.0.0.1"
     ) as c:
         card = (await c.get(CARD_PATH)).json()
     assert token in card["description"]
     assert str(SCENARIO.seller_min) not in str(card)
+
+
+async def test_foreign_host_header_is_rejected(client) -> None:
+    http, _ = client
+    response = await http.get(CARD_PATH, headers={"Host": "evil.example"})
+    assert response.status_code == 400

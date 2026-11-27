@@ -17,6 +17,8 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 from starlette.applications import Starlette
+from starlette.middleware import Middleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from handshake.backoff import with_backoff
 from handshake.config import ModelConfig, pydantic_model
@@ -26,6 +28,8 @@ DEFAULT_BASE_URL = "http://localhost:8001/"
 CARD_VERSION = "0.1.0"
 LOCAL_HOST = "127.0.0.1"
 CARD_DESCRIPTION = "Seller agent negotiating a price"
+# Loopback names only: rejects DNS-rebinding requests that carry a foreign Host header.
+ALLOWED_HOSTS = [LOCAL_HOST, "localhost"]
 # One attempt per turn, matching the ADK buyer, which has no format retry.
 OUTPUT_RETRIES = 0
 
@@ -123,7 +127,7 @@ def build_seller_app(
     )
     return A2AStarletteApplication(
         agent_card=_agent_card(base_url, card_token), http_handler=handler
-    ).build()
+    ).build(middleware=[Middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)])
 
 
 def main() -> None:  # pragma: no cover
