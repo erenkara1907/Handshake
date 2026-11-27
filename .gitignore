@@ -1,0 +1,9 @@
+.superpowers/
+.venv/
+__pycache__/
+.env
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.coverage
+runs.jsonl
