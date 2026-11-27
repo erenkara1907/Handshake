@@ -5,14 +5,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from handshake.backoff import with_backoff
 from handshake.config import ModelConfig
 from handshake.models import Scenario
 from handshake.records import RunRecord, append_record, read_records
 
-RATE_LIMIT_STATUS = 429
-DEFAULT_RETRIES = 5
-DEFAULT_BASE_DELAY_S = 2.0
-BACKOFF_FACTOR = 2
+__all__ = ["RunSpec", "build_specs", "run_all", "with_backoff"]
 
 
 class RunSpec(BaseModel):
@@ -42,36 +40,33 @@ def build_specs(
     ]
 
 
-def _is_rate_limited(error: Exception) -> bool:
-    return getattr(error, "status_code", None) == RATE_LIMIT_STATUS
-
-
-async def with_backoff[T](
-    call: Callable[[], Awaitable[T]],
-    retries: int = DEFAULT_RETRIES,
-    base_delay_s: float = DEFAULT_BASE_DELAY_S,
-    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
-) -> T:
-    for attempt in range(retries):
-        try:
-            return await call()
-        except Exception as error:
-            if not _is_rate_limited(error):
-                raise
-        await sleep(base_delay_s * BACKOFF_FACTOR**attempt)
-    return await call()
-
-
 async def run_all(
     specs: Sequence[RunSpec],
     out_path: Path,
     execute: Callable[[RunSpec], Awaitable[RunRecord]],
     concurrency: int = 1,
+    on_error: Callable[[RunSpec, Exception], None] | None = None,
 ) -> int:
     done = {record.run_id for record in read_records(out_path)}
-    pending = [spec for spec in specs if spec.run_id not in done]
+    first_by_id: dict[str, RunSpec] = {}
+    for spec in specs:
+        first_by_id.setdefault(spec.run_id, spec)
+    pending = [spec for run_id, spec in first_by_id.items() if run_id not in done]
     queue = iter(pending)
     failed = False
+    executed = 0
+
+    async def run_one(spec: RunSpec) -> None:
+        nonlocal executed
+        try:
+            record = await execute(spec)
+        except Exception as error:
+            if on_error is None:
+                raise
+            on_error(spec, error)
+            return
+        append_record(out_path, record)
+        executed += 1
 
     async def worker() -> None:
         nonlocal failed
@@ -79,7 +74,7 @@ async def run_all(
             if failed:
                 return
             try:
-                append_record(out_path, await execute(spec))
+                await run_one(spec)
             except BaseException:
                 failed = True
                 raise
@@ -92,4 +87,4 @@ async def run_all(
             task.cancel()
         await asyncio.gather(*workers, return_exceptions=True)
         raise
-    return len(pending)
+    return executed

@@ -9,17 +9,19 @@ from pathlib import Path
 import httpx
 
 from handshake.agents import build_buyer, remote_seller
+from handshake.backoff import backoff_total_s, with_backoff
 from handshake.metrics import score_run
 from handshake.models import Scenario
-from handshake.orchestrator import Negotiator, run_negotiation
+from handshake.orchestrator import DEFAULT_TURN_TIMEOUT_S, Negotiator, run_negotiation
 from handshake.records import RunRecord
 from handshake.referee import judge
-from handshake.runner import RunSpec, with_backoff
+from handshake.runner import RunSpec
 from handshake.seller_server import LOCAL_HOST
 
 SERVER_START_TIMEOUT_S = 60.0
 SERVER_POLL_S = 0.5
 SERVER_STOP_TIMEOUT_S = 10.0
+TURN_TIMEOUT_S = DEFAULT_TURN_TIMEOUT_S + backoff_total_s()
 CARD_PATH = "/.well-known/agent-card.json"
 
 
@@ -84,7 +86,7 @@ async def execute_run(spec: RunSpec) -> RunRecord:  # pragma: no cover
             await _wait_for_card(card_url, process)
             buyer = _with_retries(build_buyer(scenario, spec.buyer_model))
             seller = _with_retries(remote_seller(card_url))
-            turns = await run_negotiation(scenario, buyer, seller)
+            turns = await run_negotiation(scenario, buyer, seller, turn_timeout_s=TURN_TIMEOUT_S)
         finally:
             _stop(process)
     verdict = judge(scenario, turns)

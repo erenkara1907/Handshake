@@ -1,4 +1,6 @@
 import argparse
+import asyncio
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import uvicorn
@@ -15,6 +17,7 @@ from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 from starlette.applications import Starlette
 
+from handshake.backoff import with_backoff
 from handshake.config import ModelConfig, pydantic_model
 from handshake.models import Offer, Scenario
 
@@ -56,16 +59,23 @@ def _agent_card(base_url: str) -> AgentCard:
 
 
 class SellerExecutor(AgentExecutor):
-    def __init__(self, agent: Agent[None, Offer]) -> None:
+    def __init__(
+        self,
+        agent: Agent[None, Offer],
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    ) -> None:
         self._agent = agent
+        self._sleep = sleep
         self._histories: dict[str, list[ModelMessage]] = {}
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         key = context.context_id
         if key is None:
             raise ValueError("A2A request context has no context_id")
-        result = await self._agent.run(
-            context.get_user_input(), message_history=self._histories.get(key, [])
+        user_input = context.get_user_input()
+        history = self._histories.get(key, [])
+        result = await with_backoff(
+            lambda: self._agent.run(user_input, message_history=history), sleep=self._sleep
         )
         self._histories = {**self._histories, key: result.all_messages()}
         await event_queue.enqueue_event(
@@ -84,6 +94,7 @@ def build_seller_app(
     base_url: str = DEFAULT_BASE_URL,
     *,
     max_output_tokens: int | None = None,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
 ) -> Starlette:
     settings = ModelSettings(max_tokens=max_output_tokens) if max_output_tokens else None
     agent = Agent(
@@ -93,7 +104,7 @@ def build_seller_app(
         model_settings=settings,
     )
     handler = DefaultRequestHandler(
-        agent_executor=SellerExecutor(agent), task_store=InMemoryTaskStore()
+        agent_executor=SellerExecutor(agent, sleep), task_store=InMemoryTaskStore()
     )
     return A2AStarletteApplication(agent_card=_agent_card(base_url), http_handler=handler).build()
 

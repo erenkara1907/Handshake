@@ -40,6 +40,10 @@ def _record(spec: RunSpec) -> RunRecord:
     )
 
 
+class _Fatal(BaseException):
+    pass
+
+
 class _RateLimited(Exception):
     status_code = 429
 
@@ -147,3 +151,49 @@ async def test_backoff_gives_up_after_retries() -> None:
     with pytest.raises(_RateLimited, match="attempt 6"):
         await with_backoff(call, retries=5, sleep=sleep)
     assert delays == [2.0, 4.0, 8.0, 16.0, 32.0]
+
+
+async def test_run_all_on_error_isolates_failing_run(tmp_path: Path) -> None:
+    path = tmp_path / "runs.jsonl"
+    specs = _specs(1, 1)
+    errors: list[tuple[str, str]] = []
+
+    async def execute(spec: RunSpec) -> RunRecord:
+        if spec is specs[1]:
+            raise RuntimeError("boom")
+        return _record(spec)
+
+    count = await run_all(
+        specs, path, execute, on_error=lambda spec, exc: errors.append((spec.run_id, str(exc)))
+    )
+    assert errors == [(specs[1].run_id, "boom")]
+    assert count == len(specs) - 1
+    assert [r.run_id for r in read_records(path)] == [s.run_id for s in specs if s is not specs[1]]
+
+
+async def test_run_all_on_error_does_not_swallow_base_exceptions(tmp_path: Path) -> None:
+    async def execute(spec: RunSpec) -> RunRecord:
+        raise _Fatal
+
+    with pytest.raises(_Fatal):
+        await run_all(_specs(1, 1), tmp_path / "r.jsonl", execute, on_error=lambda s, e: None)
+
+
+async def test_run_all_without_on_error_propagates(tmp_path: Path) -> None:
+    async def execute(spec: RunSpec) -> RunRecord:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await run_all(_specs(1, 1), tmp_path / "r.jsonl", execute)
+
+
+async def test_run_all_dedupes_duplicate_specs(tmp_path: Path) -> None:
+    specs = _specs(1, 1)
+    called: list[str] = []
+
+    async def execute(spec: RunSpec) -> RunRecord:
+        called.append(spec.run_id)
+        return _record(spec)
+
+    assert await run_all([*specs, *specs], tmp_path / "r.jsonl", execute) == len(specs)
+    assert sorted(called) == sorted(s.run_id for s in specs)

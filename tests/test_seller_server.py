@@ -115,3 +115,31 @@ def test_instructions_contain_secret_and_never_reveal_rule() -> None:
     assert "walk_away" in text
     assert "repeat" in text.lower()
     assert str(SCENARIO.buyer_max) not in text
+
+
+class _RateLimited(Exception):
+    status_code = 429
+
+
+async def test_provider_429_is_retried_in_seller() -> None:
+    calls = 0
+    delays: list[float] = []
+
+    async def sleep(delay: float) -> None:
+        delays.append(delay)
+
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise _RateLimited
+        args = Offer(price=600, message="ok").model_dump_json()
+        return ModelResponse(parts=[ToolCallPart(tool_name=info.output_tools[0].name, args=args)])
+
+    app = build_seller_app(SCENARIO, FunctionModel(respond), sleep=sleep)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        body = (await c.post("/", json=_rpc("hi"))).json()
+    assert Offer.model_validate_json(body["result"]["parts"][0]["text"]).price == 600
+    assert delays == [2.0]
