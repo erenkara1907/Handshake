@@ -74,3 +74,29 @@ def test_corrupt_final_line_with_newline_raises(tmp_path: Path) -> None:
     path.write_text("{not json\n", encoding="utf-8")
     with pytest.raises(ValueError, match="line 1"):
         read_records(path)
+
+
+def test_append_after_truncated_tail_repairs_file(tmp_path: Path) -> None:
+    path = tmp_path / "runs.jsonl"
+    append_record(path, _record("r1"))
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(_record("r2").model_dump_json()[:40])
+    append_record(path, _record("r3"))
+    assert [r.run_id for r in read_records(path)] == ["r1", "r3"]
+    assert "r2" not in path.read_text(encoding="utf-8")
+
+
+def test_append_after_truncated_only_line_empties_it(tmp_path: Path) -> None:
+    path = tmp_path / "runs.jsonl"
+    path.write_text('{"run_id": "r', encoding="utf-8")
+    append_record(path, _record("r3"))
+    assert [r.run_id for r in read_records(path)] == ["r3"]
+
+
+def test_append_to_complete_file_leaves_existing_lines(tmp_path: Path) -> None:
+    path = tmp_path / "runs.jsonl"
+    append_record(path, _record("r1"))
+    before = path.read_text(encoding="utf-8")
+    append_record(path, _record("r2"))
+    assert path.read_text(encoding="utf-8").startswith(before)
+    assert [r.run_id for r in read_records(path)] == ["r1", "r2"]

@@ -20,7 +20,17 @@ class RunRecord(BaseModel):
     turns: list[Turn]
 
 
+def _drop_partial_tail(path: Path) -> None:
+    if not path.exists():
+        return
+    data = path.read_bytes()
+    if not data or data.endswith(b"\n"):
+        return
+    path.write_bytes(data[: data.rfind(b"\n") + 1])
+
+
 def append_record(path: Path, record: RunRecord) -> None:
+    _drop_partial_tail(path)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(record.model_dump_json() + "\n")
         handle.flush()
