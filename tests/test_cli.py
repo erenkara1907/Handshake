@@ -7,11 +7,21 @@ from typer.testing import CliRunner
 from handshake import cli
 from handshake.cli import app
 from handshake.metrics import RunMetrics
-from handshake.models import Outcome
+from handshake.models import Outcome, Scenario
 from handshake.records import RunRecord, append_record
 from handshake.referee import Verdict
 
 runner = CliRunner()
+
+SCENARIO = Scenario(
+    id="s",
+    item="car",
+    public_listing_price=100,
+    buyer_max=95,
+    seller_min=80,
+    max_rounds=5,
+    currency="EUR",
+)
 
 CONFIG_TEXT = """
 [[models]]
@@ -28,6 +38,7 @@ def _record(buyer: str, seller: str, scenario_id: str, repeat: int = 0) -> RunRe
     return RunRecord(
         run_id=f"{scenario_id}|{buyer}|{seller}|{repeat}",
         scenario_id=scenario_id,
+        scenario=SCENARIO,
         buyer_model=buyer,
         seller_model=seller,
         repeat=repeat,

@@ -36,6 +36,19 @@ function renderChips(m) {
   chips.append(el("li", "chip", "Rounds: " + m.rounds));
 }
 
+// Post-hoc data so leak, giveaway and invalid_deal flags can be checked by eye.
+function renderLimits(scenario) {
+  const box = $("limits");
+  const isKnown = Boolean(scenario) && typeof scenario.buyer_max === "number" &&
+    typeof scenario.seller_min === "number";
+  box.textContent = isKnown
+    ? "Hidden limits (revealed after the run): buyer_max " + scenario.buyer_max +
+      " | seller_min " + scenario.seller_min +
+      " | zopa " + (scenario.buyer_max - scenario.seller_min)
+    : "";
+  box.hidden = !isKnown;
+}
+
 function renderReplayHeader(run) {
   $("replay-meta").textContent =
     "Scenario " + run.scenario_id + " | repeat " + run.repeat +
@@ -48,6 +61,7 @@ function renderReplayHeader(run) {
     el("strong", "", "Outcome: " + verdict.outcome + (hasPrice ? " at " + verdict.price : "")),
     el("span", "", verdict.reason)
   );
+  renderLimits(run.scenario);
   renderChips(run.metrics);
 }
 

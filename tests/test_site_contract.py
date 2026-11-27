@@ -7,7 +7,7 @@ from typer.testing import CliRunner
 
 from handshake.cli import app
 from handshake.metrics import RunMetrics
-from handshake.models import Outcome, Role, Turn
+from handshake.models import Outcome, Role, Scenario, Turn
 from handshake.records import RunRecord, append_record
 from handshake.referee import Verdict
 
@@ -31,6 +31,16 @@ SITE_FILES = sorted(p.name for p in SITE.glob("*.js")) + ["index.html", "style.c
 
 runner = CliRunner()
 
+SCENARIO = Scenario(
+    id="s",
+    item="car",
+    public_listing_price=100,
+    buyer_max=95,
+    seller_min=80,
+    max_rounds=5,
+    currency="EUR",
+)
+
 
 def _parse_constant(name: str) -> list[str]:
     source = APP_JS.read_text(encoding="utf-8")
@@ -44,6 +54,7 @@ def _record(buyer: str, seller: str, scenario_id: str, repeat: int = 0) -> RunRe
     return RunRecord(
         run_id=f"{scenario_id}|{buyer}|{seller}|{repeat}",
         scenario_id=scenario_id,
+        scenario=SCENARIO,
         buyer_model=buyer,
         seller_model=seller,
         repeat=repeat,
@@ -123,3 +134,13 @@ def test_player_controls_refuse_when_aria_disabled(button_id: str) -> None:
     assert f'onEnabled("{button_id}"' in source
     guard = 'if (button.getAttribute("aria-disabled") === "true") return;'
     assert guard in source
+
+
+def test_replay_shows_hidden_limits_after_the_run() -> None:
+    player = (SITE / "player.js").read_text(encoding="utf-8")
+    html = (SITE / "index.html").read_text(encoding="utf-8")
+
+    assert 'id="limits"' in html
+    assert "Hidden limits (revealed after the run)" in player
+    for field in ("buyer_max", "seller_min", "zopa"):
+        assert field in player

@@ -21,6 +21,7 @@ def _record(spec: RunSpec) -> RunRecord:
     return RunRecord(
         run_id=spec.run_id,
         scenario_id=spec.scenario.id,
+        scenario=spec.scenario,
         buyer_model=spec.buyer_model.label,
         seller_model=spec.seller_model.label,
         repeat=spec.repeat,

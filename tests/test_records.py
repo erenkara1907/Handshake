@@ -1,17 +1,29 @@
+import json
 from pathlib import Path
 
 import pytest
 
 from handshake.metrics import RunMetrics
-from handshake.models import Offer, Outcome, Role, Turn
+from handshake.models import Offer, Outcome, Role, Scenario, Turn
 from handshake.records import RunRecord, append_record, read_records
 from handshake.referee import Verdict
+
+SCENARIO = Scenario(
+    id="s",
+    item="car",
+    public_listing_price=10000,
+    buyer_max=9000,
+    seller_min=8000,
+    max_rounds=5,
+    currency="EUR",
+)
 
 
 def _record(run_id: str = "r1") -> RunRecord:
     return RunRecord(
         run_id=run_id,
         scenario_id="s",
+        scenario=SCENARIO,
         buyer_model="a",
         seller_model="b",
         repeat=0,
@@ -37,6 +49,16 @@ def test_roundtrip(tmp_path: Path) -> None:
     append_record(path, first)
     append_record(path, second)
     assert read_records(path) == [first, second]
+    assert read_records(path)[0].scenario == SCENARIO
+
+
+def test_record_without_scenario_is_rejected_with_line_number(tmp_path: Path) -> None:
+    path = tmp_path / "runs.jsonl"
+    legacy = _record("r1").model_dump(mode="json")
+    del legacy["scenario"]
+    path.write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="line 1"):
+        read_records(path)
 
 
 def test_missing_file_is_empty(tmp_path: Path) -> None:

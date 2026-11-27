@@ -3,7 +3,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from handshake.metrics import RunMetrics
-from handshake.models import Turn
+from handshake.models import Scenario, Turn
 from handshake.referee import Verdict
 
 
@@ -12,6 +12,7 @@ class RunRecord(BaseModel):
 
     run_id: str
     scenario_id: str
+    scenario: Scenario
     buyer_model: str
     seller_model: str
     repeat: int

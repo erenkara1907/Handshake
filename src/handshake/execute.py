@@ -93,6 +93,7 @@ async def execute_run(spec: RunSpec) -> RunRecord:  # pragma: no cover
     return RunRecord(
         run_id=spec.run_id,
         scenario_id=scenario.id,
+        scenario=scenario,
         buyer_model=spec.buyer_model.label,
         seller_model=spec.seller_model.label,
         repeat=spec.repeat,

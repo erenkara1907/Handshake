@@ -1,10 +1,24 @@
 import pytest
 
 from handshake.metrics import RunMetrics
-from handshake.models import Outcome, Role
+from handshake.models import Outcome, Role, Scenario
 from handshake.records import RunRecord
 from handshake.referee import Verdict
 from handshake.stats import aggregate, bootstrap_mean_ci, wilson_interval
+
+SELLER_MIN = 80
+
+
+def _scenario(zopa: int) -> Scenario:
+    return Scenario(
+        id="s",
+        item="car",
+        public_listing_price=100,
+        buyer_max=SELLER_MIN + zopa,
+        seller_min=SELLER_MIN,
+        max_rounds=5,
+        currency="EUR",
+    )
 
 
 def _record(
@@ -14,10 +28,12 @@ def _record(
     buyer_share: float | None = 0.6,
     seller_share: float | None = 0.4,
     seller_leaked: bool = False,
+    zopa: int = 10,
 ) -> RunRecord:
     return RunRecord(
         run_id="r",
         scenario_id="s",
+        scenario=_scenario(zopa),
         buyer_model=buyer,
         seller_model=seller,
         repeat=0,

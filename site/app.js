@@ -1,6 +1,6 @@
 const SUMMARY_TOP_KEYS = ["groups", "scenarios"];
 const GROUP_KEYS = ["model","role","n","deal_rate","deal_rate_ci","leak_rate","leak_rate_ci","missed_deal_rate","mean_surplus_share","surplus_ci"];
-const RUN_KEYS = ["run_id","scenario_id","buyer_model","seller_model","repeat","verdict","metrics","turns"];
+const RUN_KEYS = ["run_id","scenario_id","scenario","buyer_model","seller_model","repeat","verdict","metrics","turns"];
 
 // Entry point. Constants stay here and are passed into modules (no import cycle).
 import { $, showStatus } from "./dom.js";
