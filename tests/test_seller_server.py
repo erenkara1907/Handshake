@@ -143,3 +143,14 @@ async def test_provider_429_is_retried_in_seller() -> None:
         body = (await c.post("/", json=_rpc("hi"))).json()
     assert Offer.model_validate_json(body["result"]["parts"][0]["text"]).price == 600
     assert delays == [2.0]
+
+
+async def test_agent_card_description_carries_run_token() -> None:
+    token = "0123456789abcdef0123456789abcdef"
+    app = build_seller_app(SCENARIO, _model([]), card_token=token)
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        card = (await c.get(CARD_PATH)).json()
+    assert token in card["description"]
+    assert str(SCENARIO.seller_min) not in str(card)

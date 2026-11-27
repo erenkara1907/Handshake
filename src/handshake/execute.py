@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 
 import httpx
@@ -40,19 +41,32 @@ def _stop(process: subprocess.Popen) -> None:
         process.wait()
 
 
-async def _wait_for_card(card_url: str, process: subprocess.Popen) -> None:
+async def _serves_our_card(client: httpx.AsyncClient, card_url: str, token: str) -> bool:
+    try:
+        response = await client.get(card_url)
+    except httpx.TransportError:
+        return False
+    if response.status_code != httpx.codes.OK:
+        return False
+    try:
+        card = response.json()
+    except ValueError:
+        return False
+    return isinstance(card, dict) and token in str(card.get("description", ""))
+
+
+async def _wait_for_card(card_url: str, process: subprocess.Popen, token: str) -> None:
+    # A port race at concurrency > 1 can put another run's seller on our port: only a card
+    # carrying this run's token, served while our child is alive, counts as ready.
     deadline = time.monotonic() + SERVER_START_TIMEOUT_S
     async with httpx.AsyncClient() as client:
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 raise RuntimeError(f"seller exited early with code {process.returncode}")
-            try:
-                if (await client.get(card_url)).status_code == httpx.codes.OK:
-                    return
-            except httpx.TransportError:
-                pass
+            if await _serves_our_card(client, card_url, token):
+                return
             await asyncio.sleep(SERVER_POLL_S)
-    raise TimeoutError("seller agent card not reachable")
+    raise TimeoutError(f"seller agent card with this run's token not served at {card_url}")
 
 
 def _with_retries(negotiator: Negotiator) -> Negotiator:
@@ -62,7 +76,9 @@ def _with_retries(negotiator: Negotiator) -> Negotiator:
     return call
 
 
-def _start_seller(scenario: Scenario, spec: RunSpec, workdir: Path, port: int) -> subprocess.Popen:
+def _start_seller(
+    scenario: Scenario, spec: RunSpec, workdir: Path, port: int, token: str
+) -> subprocess.Popen:
     scenario_file = workdir / "scenario.json"
     scenario_file.write_text(scenario.model_dump_json(), encoding="utf-8")
     cfg_file = workdir / "model.json"
@@ -72,6 +88,7 @@ def _start_seller(scenario: Scenario, spec: RunSpec, workdir: Path, port: int) -
         "--scenario-json", str(scenario_file),
         "--model-config-json", str(cfg_file),
         "--port", str(port),
+        "--card-token", token,
     ]  # fmt: skip
     return subprocess.Popen(cmd)
 
@@ -80,10 +97,11 @@ async def execute_run(spec: RunSpec) -> RunRecord:  # pragma: no cover
     scenario = spec.scenario
     port = _free_port()
     card_url = f"http://{LOCAL_HOST}:{port}{CARD_PATH}"
+    token = uuid.uuid4().hex
     with tempfile.TemporaryDirectory() as tmp:
-        process = _start_seller(scenario, spec, Path(tmp), port)
+        process = _start_seller(scenario, spec, Path(tmp), port, token)
         try:
-            await _wait_for_card(card_url, process)
+            await _wait_for_card(card_url, process, token)
             buyer = _with_retries(build_buyer(scenario, spec.buyer_model))
             seller = _with_retries(remote_seller(card_url))
             turns = await run_negotiation(scenario, buyer, seller, turn_timeout_s=TURN_TIMEOUT_S)

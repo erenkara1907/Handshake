@@ -25,6 +25,7 @@ from handshake.models import Offer, Scenario
 DEFAULT_BASE_URL = "http://localhost:8001/"
 CARD_VERSION = "0.1.0"
 LOCAL_HOST = "127.0.0.1"
+CARD_DESCRIPTION = "Seller agent negotiating a price"
 # One attempt per turn, matching the ADK buyer, which has no format retry.
 OUTPUT_RETRIES = 0
 
@@ -46,10 +47,14 @@ def seller_instructions(scenario: Scenario) -> str:
     )
 
 
-def _agent_card(base_url: str) -> AgentCard:
+def _agent_card(base_url: str, card_token: str | None) -> AgentCard:
+    # The token lets the launcher verify it reached this run's seller, not a neighbour's.
+    description = (
+        CARD_DESCRIPTION if card_token is None else f"{CARD_DESCRIPTION} [run {card_token}]"
+    )
     return AgentCard(
         name="seller",
-        description="Seller agent negotiating a price",
+        description=description,
         url=base_url,
         version=CARD_VERSION,
         default_input_modes=["text"],
@@ -103,6 +108,7 @@ def build_seller_app(
     *,
     max_output_tokens: int | None = None,
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    card_token: str | None = None,
 ) -> Starlette:
     settings = ModelSettings(max_tokens=max_output_tokens) if max_output_tokens else None
     agent = Agent(
@@ -115,7 +121,9 @@ def build_seller_app(
     handler = DefaultRequestHandler(
         agent_executor=SellerExecutor(agent, sleep), task_store=InMemoryTaskStore()
     )
-    return A2AStarletteApplication(agent_card=_agent_card(base_url), http_handler=handler).build()
+    return A2AStarletteApplication(
+        agent_card=_agent_card(base_url, card_token), http_handler=handler
+    ).build()
 
 
 def main() -> None:  # pragma: no cover
@@ -123,6 +131,7 @@ def main() -> None:  # pragma: no cover
     parser.add_argument("--scenario-json", type=Path, required=True)
     parser.add_argument("--model-config-json", type=Path, required=True)
     parser.add_argument("--port", type=int, required=True)
+    parser.add_argument("--card-token", default=None)
     args = parser.parse_args()
     scenario = Scenario.model_validate_json(args.scenario_json.read_text())
     cfg = ModelConfig.model_validate_json(args.model_config_json.read_text())
@@ -131,6 +140,7 @@ def main() -> None:  # pragma: no cover
         pydantic_model(cfg),
         f"http://{LOCAL_HOST}:{args.port}/",
         max_output_tokens=cfg.max_output_tokens,
+        card_token=args.card_token,
     )
     uvicorn.run(app, host=LOCAL_HOST, port=args.port)
 
