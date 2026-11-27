@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from handshake.config import ConfigError, ModelConfig, load_models
 from handshake.execute import execute_run
+from handshake.logging_setup import configure_logging
 from handshake.records import read_records
 from handshake.runner import RunSpec, build_specs, run_all
 from handshake.scenarios import generate_scenarios
@@ -75,6 +76,7 @@ def run(
     # shell did not set (override=False: an exported variable always wins). The seller
     # subprocess inherits os.environ, so it sees the same key.
     load_dotenv(find_dotenv(usecwd=True), override=False)
+    configure_logging()
     models = _load_models_or_exit(config)
     specs = build_specs(generate_scenarios(seed, scenarios), models, repeats)
     out.parent.mkdir(parents=True, exist_ok=True)

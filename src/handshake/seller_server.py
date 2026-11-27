@@ -20,7 +20,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from handshake.backoff import with_backoff
+from handshake.backoff import announce_rate_limit_wait, with_backoff
 from handshake.config import ModelConfig, pydantic_model
 from handshake.models import Offer, Scenario
 
@@ -106,7 +106,9 @@ class SellerExecutor(AgentExecutor):
         history = self._histories.get(key, [])
         try:
             result = await with_backoff(
-                lambda: self._agent.run(user_input, message_history=history), sleep=self._sleep
+                lambda: self._agent.run(user_input, message_history=history),
+                sleep=self._sleep,
+                on_retry=announce_rate_limit_wait,
             )
         except UnexpectedModelBehavior as error:
             # A format failure is a scored outcome: reply with non-Offer text so the
@@ -168,7 +170,8 @@ def main() -> None:  # pragma: no cover
         max_output_tokens=cfg.max_output_tokens,
         card_token=args.card_token,
     )
-    uvicorn.run(app, host=LOCAL_HOST, port=args.port)
+    # Warning level: the per-request access lines would bury the run's real messages.
+    uvicorn.run(app, host=LOCAL_HOST, port=args.port, log_level="warning")
 
 
 if __name__ == "__main__":  # pragma: no cover

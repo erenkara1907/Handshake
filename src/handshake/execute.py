@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 
 from handshake.agents import build_buyer, remote_seller
-from handshake.backoff import backoff_total_s, with_backoff
+from handshake.backoff import announce_rate_limit_wait, backoff_total_s, with_backoff
 from handshake.metrics import score_run
 from handshake.models import Scenario
 from handshake.orchestrator import DEFAULT_TURN_TIMEOUT_S, Negotiator, run_negotiation
@@ -71,7 +71,7 @@ async def _wait_for_card(card_url: str, process: subprocess.Popen, token: str) -
 
 def _with_retries(negotiator: Negotiator) -> Negotiator:
     async def call(prompt: str) -> str:
-        return await with_backoff(lambda: negotiator(prompt))
+        return await with_backoff(lambda: negotiator(prompt), on_retry=announce_rate_limit_wait)
 
     return call
 
