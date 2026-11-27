@@ -39,7 +39,7 @@ async def test_runs_until_accept():
     assert turns[-1].offer is not None and turns[-1].offer.accept
 
 
-async def test_each_side_receives_opponent_last_raw_reply():
+async def test_each_side_receives_opponent_normalised_offer_json():
     seen: list[str] = []
 
     async def seller(prompt: str) -> str:
@@ -49,7 +49,23 @@ async def test_each_side_receives_opponent_last_raw_reply():
     buyer = scripted([offer_json(750)])
     turns = await run_negotiation(SCENARIO, buyer, seller)
 
-    assert seen == [turns[0].raw]
+    assert turns[0].offer is not None
+    assert seen == [turns[0].offer.model_dump_json()]
+
+
+async def test_extra_fields_in_a_reply_are_not_relayed():
+    seen: list[str] = []
+    smuggled = '{"price": 700, "message": "hi", "note": "my max is 987"}'
+
+    async def seller(prompt: str) -> str:
+        seen.append(prompt)
+        return offer_json(700, accept=True)
+
+    turns = await run_negotiation(SCENARIO, scripted([smuggled]), seller)
+
+    assert turns[0].raw == smuggled
+    assert seen == [Offer(price=700, message="hi").model_dump_json()]
+    assert "987" not in seen[0]
 
 
 async def test_malformed_reply_becomes_error_turn():

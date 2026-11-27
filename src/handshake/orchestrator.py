@@ -53,5 +53,7 @@ async def run_negotiation(
         role = Role.BUYER if len(turns) % TURNS_PER_ROUND == 0 else Role.SELLER
         turn = await _take_turn(role, negotiators[role], prompt, turn_timeout_s)
         turns = [*turns, turn]
-        prompt = turn.raw
+        # Relay only the validated fields: extra keys in the raw reply could carry text the
+        # leak detector (which reads offer.message) never sees. An unparsed turn ends the run.
+        prompt = turn.offer.model_dump_json() if turn.offer is not None else turn.raw
     return turns
