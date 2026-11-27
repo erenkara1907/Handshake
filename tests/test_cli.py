@@ -182,3 +182,15 @@ def test_on_error_handler_does_not_crash(tmp_path: Path, monkeypatch: pytest.Mon
     runner.invoke(app, ["run", "--config", str(config), "--scenarios", "1", "--repeats", "1"])
 
     captured["on_error"](captured["specs"][0], RuntimeError("x"))
+
+
+def test_run_creates_missing_out_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = tmp_path / "c.toml"
+    config.write_text(CONFIG_TEXT)
+    _patch_run_all(monkeypatch)
+    out = tmp_path / "a" / "b" / "runs.jsonl"
+
+    result = runner.invoke(app, ["run", "--config", str(config), "--out", str(out)])
+
+    assert result.exit_code == 0
+    assert out.parent.is_dir()

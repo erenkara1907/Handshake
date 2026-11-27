@@ -69,6 +69,7 @@ def run(
     """Run the model-vs-model negotiation sweep, resuming from OUT."""
     models = _load_models_or_exit(config)
     specs = build_specs(generate_scenarios(seed, scenarios), models, repeats)
+    out.parent.mkdir(parents=True, exist_ok=True)
     executed = asyncio.run(
         run_all(specs, out, execute_run, concurrency=concurrency, on_error=_on_error)
     )
