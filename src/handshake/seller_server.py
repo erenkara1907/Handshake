@@ -12,6 +12,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
@@ -24,6 +25,8 @@ from handshake.models import Offer, Scenario
 DEFAULT_BASE_URL = "http://localhost:8001/"
 CARD_VERSION = "0.1.0"
 LOCAL_HOST = "127.0.0.1"
+# One attempt per turn, matching the ADK buyer, which has no format retry.
+OUTPUT_RETRIES = 0
 
 
 def seller_instructions(scenario: Scenario) -> str:
@@ -74,14 +77,19 @@ class SellerExecutor(AgentExecutor):
             raise ValueError("A2A request context has no context_id")
         user_input = context.get_user_input()
         history = self._histories.get(key, [])
-        result = await with_backoff(
-            lambda: self._agent.run(user_input, message_history=history), sleep=self._sleep
-        )
-        self._histories = {**self._histories, key: result.all_messages()}
-        await event_queue.enqueue_event(
-            new_agent_text_message(
-                result.output.model_dump_json(), context_id=key, task_id=context.task_id
+        try:
+            result = await with_backoff(
+                lambda: self._agent.run(user_input, message_history=history), sleep=self._sleep
             )
+        except UnexpectedModelBehavior as error:
+            # A format failure is a scored outcome: reply with non-Offer text so the
+            # orchestrator records a protocol_error turn. Infra errors keep raising.
+            reply = f"[seller produced no valid Offer after 1 attempt: {type(error).__name__}]"
+        else:
+            self._histories = {**self._histories, key: result.all_messages()}
+            reply = result.output.model_dump_json()
+        await event_queue.enqueue_event(
+            new_agent_text_message(reply, context_id=key, task_id=context.task_id)
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
@@ -102,6 +110,7 @@ def build_seller_app(
         output_type=Offer,
         instructions=seller_instructions(scenario),
         model_settings=settings,
+        retries={"output": OUTPUT_RETRIES},
     )
     handler = DefaultRequestHandler(
         agent_executor=SellerExecutor(agent, sleep), task_store=InMemoryTaskStore()
