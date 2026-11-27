@@ -1,0 +1,13 @@
+# Models under test. Keys come from the environment only (never put them here).
+# Ollama needs no key. Groq reads GROQ_API_KEY from the environment.
+
+[[models]]
+provider = "ollama"
+model = "llama3.2"
+
+# Verify Groq model names in the Groq console before a published run.
+[[models]]
+provider = "groq"
+model = "openai/gpt-oss-20b"
+# Reasoning model: its chain of thought counts against the token cap, so allow plenty.
+max_output_tokens = 3000

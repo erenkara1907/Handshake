@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Handshake replay</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="masthead">
+  <p class="eyebrow">Handshake</p>
+  <h1>Two language models haggle over a price. Here is what happened.</h1>
+  <p class="note" role="note">Small samples: n is shown for every row, and a 95% interval for deal, leak, giveaway and surplus figures. Deal and missed-deal rates count feasible runs only. This is a measurement of these runs, not a ranking of models.</p>
+</header>
+
+<main>
+  <div id="boot-note" class="status" role="alert">
+    <p><strong>No data is showing yet.</strong> This page needs a small web server and a results file. If this message stays, the file was opened straight from disk or JavaScript is off.</p>
+    <p>In the project folder run <code>uv run handshake serve runs.jsonl</code>. It builds the data, starts the server and opens this page for you.</p>
+  </div>
+  <div id="status" class="status" role="status" hidden></div>
+
+  <section aria-labelledby="h-board">
+    <h2 id="h-board">Leaderboard</h2>
+    <div class="scroll" tabindex="0" role="region" aria-label="Leaderboard table, scrolls horizontally">
+      <table id="board">
+        <thead><tr id="board-head"></tr></thead>
+        <tbody id="board-body"></tbody>
+      </table>
+    </div>
+    <p class="hint">Sorted by model, then role. Use the column buttons to re-sort.</p>
+  </section>
+
+  <section aria-labelledby="h-runs">
+    <h2 id="h-runs">Runs</h2>
+    <div class="filters">
+      <label>Scenario <select id="f-scenario"></select></label>
+      <label>Outcome <select id="f-outcome"></select></label>
+      <span id="run-count" class="hint"></span>
+    </div>
+    <ul id="run-list" class="run-list"></ul>
+  </section>
+
+  <section aria-labelledby="h-replay">
+    <h2 id="h-replay">Replay</h2>
+    <p id="replay-empty" class="hint">Select a run above to replay it.</p>
+    <div id="replay" hidden>
+      <p id="replay-meta" class="meta"></p>
+      <div id="banner" class="banner"></div>
+      <p id="limits" class="meta"></p>
+      <ul id="chips" class="chips"></ul>
+      <div class="controls">
+        <button type="button" id="b-prev">Prev</button>
+        <button type="button" id="b-play" aria-pressed="false">Play</button>
+        <button type="button" id="b-next">Next</button>
+        <button type="button" id="b-reset">Reset</button>
+      </div>
+      <p id="step-live" class="hint" aria-live="polite"></p>
+      <ol id="thread" class="thread"></ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>This page loads <code>data/summary.json</code> and <code>data/runs.jsonl</code> with <code>fetch</code>, which does not work from a <code>file://</code> address. The easy way is <code>uv run handshake serve runs.jsonl</code>; by hand, serve the folder over http, for example <code>python3 -m http.server -d site</code>, then open the printed address.</p>
+  <p>All text from the runs is untrusted model output and is shown as plain text.</p>
+</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>
