@@ -12,6 +12,7 @@ dependencies = [
     "httpx",
     "uvicorn",
     "litellm>=1.111.0",
+    "python-dotenv>=1.2.4",
 ]
 
 [project.scripts]

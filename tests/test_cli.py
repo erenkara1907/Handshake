@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -182,6 +183,45 @@ def test_on_error_handler_does_not_crash(tmp_path: Path, monkeypatch: pytest.Mon
     runner.invoke(app, ["run", "--config", str(config), "--scenarios", "1", "--repeats", "1"])
 
     captured["on_error"](captured["specs"][0], RuntimeError("x"))
+
+
+def _forget_groq_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    # setenv then delenv registers the undo, so a key loaded from a .env never leaks to other tests.
+    monkeypatch.setenv("GROQ_API_KEY", "placeholder")
+    monkeypatch.delenv("GROQ_API_KEY")
+
+
+def test_run_loads_api_key_from_dotenv_in_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = tmp_path / "c.toml"
+    config.write_text(CONFIG_TEXT)
+    (tmp_path / ".env").write_text("GROQ_API_KEY=key-from-dotenv\n")
+    monkeypatch.chdir(tmp_path)
+    _forget_groq_key(monkeypatch)
+    _patch_run_all(monkeypatch)
+
+    result = runner.invoke(app, ["run", "--config", str(config), "--out", "runs.jsonl"])
+
+    assert result.exit_code == 0
+    assert os.environ["GROQ_API_KEY"] == "key-from-dotenv"
+    assert "key-from-dotenv" not in result.output
+
+
+def test_environment_variable_wins_over_dotenv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = tmp_path / "c.toml"
+    config.write_text(CONFIG_TEXT)
+    (tmp_path / ".env").write_text("GROQ_API_KEY=key-from-dotenv\n")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GROQ_API_KEY", "key-from-shell")
+    _patch_run_all(monkeypatch)
+
+    result = runner.invoke(app, ["run", "--config", str(config), "--out", "runs.jsonl"])
+
+    assert result.exit_code == 0
+    assert os.environ["GROQ_API_KEY"] == "key-from-shell"
 
 
 def test_run_creates_missing_out_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

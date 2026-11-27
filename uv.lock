@@ -1043,6 +1043,7 @@ dependencies = [
     { name = "litellm" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim", extra = ["openai"] },
+    { name = "python-dotenv" },
     { name = "typer" },
     { name = "uvicorn" },
 ]
@@ -1063,6 +1064,7 @@ requires-dist = [
     { name = "litellm", specifier = ">=1.111.0" },
     { name = "pydantic" },
     { name = "pydantic-ai-slim", extras = ["openai"], specifier = "==1.107.0" },
+    { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "typer" },
     { name = "uvicorn" },
 ]

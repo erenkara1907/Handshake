@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from dotenv import find_dotenv, load_dotenv
 from pydantic import ValidationError
 
 from handshake.config import ConfigError, ModelConfig, load_models
@@ -67,6 +68,10 @@ def run(
     concurrency: Annotated[int, typer.Option(help="Concurrent runs.")] = 1,
 ) -> None:
     """Run the model-vs-model negotiation sweep, resuming from OUT."""
+    # Keys come from the environment; a .env in the working directory fills in what the
+    # shell did not set (override=False: an exported variable always wins). The seller
+    # subprocess inherits os.environ, so it sees the same key.
+    load_dotenv(find_dotenv(usecwd=True), override=False)
     models = _load_models_or_exit(config)
     specs = build_specs(generate_scenarios(seed, scenarios), models, repeats)
     out.parent.mkdir(parents=True, exist_ok=True)
