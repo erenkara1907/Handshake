@@ -80,6 +80,35 @@ async def test_buyer_keeps_history_across_calls():
     assert "second seller message" in second_request
 
 
+class ThoughtLlm(FakeLlm):
+    """Mimics reasoning models: a `thought` part followed by the real answer part."""
+
+    answer: str = CANNED.model_dump_json()
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        parts = [types.Part(text="We must make an opening offer, maybe 17000.", thought=True)]
+        if self.answer:
+            parts.append(types.Part(text=self.answer))
+        yield LlmResponse(content=types.Content(role="model", parts=parts))
+
+
+async def test_buyer_ignores_reasoning_thought_parts():
+    buyer = build_buyer(SCENARIO, CFG, llm=ThoughtLlm(seen=[]))
+
+    raw = await buyer("Opening prompt")
+
+    assert Offer.model_validate_json(raw) == CANNED
+
+
+async def test_buyer_raises_when_only_thought_parts_are_returned():
+    buyer = build_buyer(SCENARIO, CFG, llm=ThoughtLlm(seen=[], answer=""))
+
+    with pytest.raises(RuntimeError, match="no text"):
+        await buyer("Opening prompt")
+
+
 async def test_buyer_raises_when_final_event_has_no_text():
     class EmptyLlm(FakeLlm):
         async def generate_content_async(

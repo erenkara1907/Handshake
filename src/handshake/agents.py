@@ -33,7 +33,9 @@ def buyer_instructions(scenario: Scenario) -> str:
 def _final_text(events: list) -> str:
     final = [e for e in events if e.is_final_response()]
     parts = final[-1].content.parts if final and final[-1].content else []
-    text = "".join(p.text for p in parts or [] if p.text)
+    # Reasoning models (e.g. gpt-oss on Groq) return their chain of thought as
+    # `thought` parts ahead of the answer; only the answer is the agent's reply.
+    text = "".join(p.text for p in parts or [] if p.text and not p.thought)
     if not text:
         raise RuntimeError("ADK agent produced no text in its final response")
     return text
