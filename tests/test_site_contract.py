@@ -13,7 +13,21 @@ from handshake.referee import Verdict
 
 SITE = Path(__file__).resolve().parent.parent / "site"
 APP_JS = SITE / "app.js"
-UNSAFE_HTML_SINKS = ("innerHTML", "insertAdjacentHTML", "outerHTML", "document.write")
+UNSAFE_SINKS = (
+    "innerHTML",
+    "insertAdjacentHTML",
+    "outerHTML",
+    "document.write",
+    "eval(",
+    "new Function",
+    'setAttribute("href"',
+    "setAttribute('href'",
+)
+HONESTY_NOTE = (
+    "Small samples: n is shown for every row, and a 95% interval for deal, leak "
+    "and surplus figures. This is a measurement of these runs, not a ranking of models."
+)
+SITE_FILES = sorted(p.name for p in SITE.glob("*.js")) + ["index.html", "style.css"]
 
 runner = CliRunner()
 
@@ -77,16 +91,26 @@ def test_run_record_keys_match_site_expectations() -> None:
     assert set(dumped) == set(_parse_constant("RUN_KEYS"))
 
 
-def test_app_js_has_no_unsafe_html_sinks() -> None:
-    source = APP_JS.read_text(encoding="utf-8")
-
-    for sink in UNSAFE_HTML_SINKS:
-        assert sink not in source, f"app.js must not use {sink}"
+def test_site_has_js_modules() -> None:
+    assert "app.js" in SITE_FILES
+    assert len([n for n in SITE_FILES if n.endswith(".js")]) > 1
 
 
-@pytest.mark.parametrize("name", ["index.html", "app.js", "style.css"])
+@pytest.mark.parametrize("path", sorted(SITE.glob("*.js")), ids=lambda p: p.name)
+def test_site_js_has_no_unsafe_sinks(path: Path) -> None:
+    source = path.read_text(encoding="utf-8")
+
+    for sink in UNSAFE_SINKS:
+        assert sink not in source, f"{path.name} must not use {sink}"
+
+
+@pytest.mark.parametrize("name", SITE_FILES)
 def test_site_makes_no_external_requests(name: str) -> None:
     text = (SITE / name).read_text(encoding="utf-8")
 
     assert "http://" not in text
     assert "https://" not in text
+
+
+def test_index_html_has_honesty_note() -> None:
+    assert HONESTY_NOTE in (SITE / "index.html").read_text(encoding="utf-8")

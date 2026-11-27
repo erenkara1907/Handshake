@@ -11,7 +11,7 @@
 <header class="masthead">
   <p class="eyebrow">Handshake</p>
   <h1>Two language models haggle over a price. Here is what happened.</h1>
-  <p class="note" role="note">Small samples: every rate shows n and a 95% interval. This is a measurement of these runs, not a ranking of models.</p>
+  <p class="note" role="note">Small samples: n is shown for every row, and a 95% interval for deal, leak and surplus figures. This is a measurement of these runs, not a ranking of models.</p>
 </header>
 
 <main>
@@ -61,6 +61,6 @@
   <p>This page loads <code>data/summary.json</code> and <code>data/runs.jsonl</code> with <code>fetch</code>, which does not work from a <code>file://</code> address. Serve the folder over http, for example <code>python3 -m http.server -d site</code>, then open the printed address.</p>
   <p>All text from the runs is untrusted model output and is shown as plain text.</p>
 </footer>
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>
