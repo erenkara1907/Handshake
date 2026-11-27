@@ -114,3 +114,12 @@ def test_site_makes_no_external_requests(name: str) -> None:
 
 def test_index_html_has_honesty_note() -> None:
     assert HONESTY_NOTE in (SITE / "index.html").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("button_id", ["b-prev", "b-next", "b-reset"])
+def test_player_controls_refuse_when_aria_disabled(button_id: str) -> None:
+    source = (SITE / "player.js").read_text(encoding="utf-8")
+
+    assert f'onEnabled("{button_id}"' in source
+    guard = 'if (button.getAttribute("aria-disabled") === "true") return;'
+    assert guard in source

@@ -123,13 +123,22 @@ function togglePlay() {
   state.timer = setInterval(() => go(1), PLAY_INTERVAL_MS);
 }
 
+// A control marked aria-disabled must refuse to act, not just look inactive.
+function onEnabled(id, action) {
+  const button = $(id);
+  button.addEventListener("click", () => {
+    if (button.getAttribute("aria-disabled") === "true") return;
+    action();
+  });
+}
+
 export function wirePlayer() {
-  $("b-prev").addEventListener("click", () => { stopPlay(); go(-1); });
-  $("b-next").addEventListener("click", () => { stopPlay(); go(1); });
-  $("b-play").addEventListener("click", togglePlay);
-  $("b-reset").addEventListener("click", () => {
+  onEnabled("b-prev", () => { stopPlay(); go(-1); });
+  onEnabled("b-next", () => { stopPlay(); go(1); });
+  onEnabled("b-reset", () => {
     stopPlay();
     state.step = state.selected.turns.length > 0 ? 1 : 0;
     renderThread();
   });
+  $("b-play").addEventListener("click", togglePlay);
 }

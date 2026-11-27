@@ -82,7 +82,7 @@ select, button {
 select { max-width: 100%; }
 button { cursor: pointer; }
 .controls button { min-width: 4.5rem; }
-.controls button:hover, .run-list button:hover { border-color: var(--accent); }
+.controls button:not([aria-disabled="true"]):hover, .run-list button:hover { border-color: var(--accent); }
 .controls button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button[aria-disabled="true"] { opacity: .5; cursor: default; }
 
