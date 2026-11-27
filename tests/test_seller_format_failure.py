@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 import httpx
 import pytest
 import uvicorn
+from pydantic_ai.exceptions import ModelHTTPError
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
@@ -107,6 +108,36 @@ async def test_invalid_then_valid_output_is_not_recovered() -> None:
     with pytest.raises(ValueError):
         Offer.model_validate_json(text)
     assert str(SCENARIO.seller_min) not in text
+
+
+FAILED_GENERATION = '{"name": "final_result<|channel|>commentary", "arguments": {"price": 600}}'
+
+
+async def test_provider_tool_use_failed_is_recorded_as_format_failure() -> None:
+    # Groq answers HTTP 400 `tool_use_failed` when the model emits a malformed tool call:
+    # that is the model's format failure, so it must be scored, not skipped as infrastructure.
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        body = {"code": "tool_use_failed", "failed_generation": FAILED_GENERATION}
+        raise ModelHTTPError(400, "openai/gpt-oss-20b", body)
+
+    body = await _send(FunctionModel(respond))
+
+    text = body["result"]["parts"][0]["text"]
+    assert text.startswith("[seller produced no valid Offer")
+    assert "tool_use_failed" in text
+    assert "channel" not in text
+    with pytest.raises(ValueError):
+        Offer.model_validate_json(text)
+
+
+async def test_other_provider_http_errors_still_raise() -> None:
+    def respond(messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
+        raise ModelHTTPError(400, "openai/gpt-oss-20b", {"code": "invalid_api_key"})
+
+    body = await _send(FunctionModel(respond))
+
+    assert "error" in body
+    assert "result" not in body
 
 
 async def test_non_format_model_errors_still_raise() -> None:

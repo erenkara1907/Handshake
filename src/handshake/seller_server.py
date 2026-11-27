@@ -12,7 +12,7 @@ from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCapabilities, AgentCard, AgentSkill
 from a2a.utils import new_agent_text_message
 from pydantic_ai import Agent
-from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.exceptions import ModelHTTPError, UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
@@ -32,6 +32,8 @@ CARD_DESCRIPTION = "Seller agent negotiating a price"
 ALLOWED_HOSTS = [LOCAL_HOST, "localhost"]
 # One attempt per turn, matching the ADK buyer, which has no format retry.
 OUTPUT_RETRIES = 0
+HTTP_BAD_REQUEST = 400
+TOOL_USE_FAILED = "tool_use_failed"
 
 
 def seller_instructions(scenario: Scenario) -> str:
@@ -48,6 +50,22 @@ def seller_instructions(scenario: Scenario) -> str:
         "Accept only by repeating the buyer's last price in price with accept=true, "
         "and only if that price is at least your minimum. "
         "Set walk_away=true only if no deal is possible."
+    )
+
+
+def _format_failure_reply(reason: str) -> str:
+    # Never include provider/model text here: it may echo the prompt, including the secret.
+    return f"[seller produced no valid Offer after 1 attempt: {reason}]"
+
+
+def _is_tool_use_failure(error: ModelHTTPError) -> bool:
+    # Groq answers HTTP 400 `tool_use_failed` when the model emits a malformed tool call
+    # (a model format failure, not an infrastructure problem), so it is scored, not retried.
+    body = error.body
+    return (
+        error.status_code == HTTP_BAD_REQUEST
+        and isinstance(body, dict)
+        and body.get("code") == TOOL_USE_FAILED
     )
 
 
@@ -93,7 +111,11 @@ class SellerExecutor(AgentExecutor):
         except UnexpectedModelBehavior as error:
             # A format failure is a scored outcome: reply with non-Offer text so the
             # orchestrator records a protocol_error turn. Infra errors keep raising.
-            reply = f"[seller produced no valid Offer after 1 attempt: {type(error).__name__}]"
+            reply = _format_failure_reply(type(error).__name__)
+        except ModelHTTPError as error:
+            if not _is_tool_use_failure(error):
+                raise
+            reply = _format_failure_reply(TOOL_USE_FAILED)
         else:
             self._histories = {**self._histories, key: result.all_messages()}
             reply = result.output.model_dump_json()
