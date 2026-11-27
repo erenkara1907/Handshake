@@ -109,3 +109,20 @@ def test_wrong_role_order_is_protocol_error() -> None:
 def test_judge_raises_when_not_over() -> None:
     with pytest.raises(ValueError):
         judge(SCENARIO, [t(B, 7500)])
+
+
+def test_turn_beyond_cap_cannot_decide() -> None:
+    turns = [*capped_turns(), t(B, 8005, accept=True)]
+    assert judge(SCENARIO, turns).outcome == Outcome.MAX_ROUNDS
+
+
+def test_accept_on_last_allowed_turn_is_deal() -> None:
+    turns = [*capped_turns()[:5], t(S, 8004, accept=True)]
+    verdict = judge(SCENARIO, turns)
+    assert verdict.outcome == Outcome.DEAL
+    assert verdict.price == 8004
+
+
+def test_accept_with_walk_away_is_no_deal() -> None:
+    turns = [t(B, 7500), t(S, 7500, accept=True, walk=True)]
+    assert judge(SCENARIO, turns).outcome == Outcome.NO_DEAL

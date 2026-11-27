@@ -55,7 +55,8 @@ def _judge_turn(scenario: Scenario, turns: Sequence[Turn], index: int) -> Verdic
 
 
 def _first_verdict(scenario: Scenario, turns: Sequence[Turn]) -> Verdict | None:
-    for index in range(len(turns)):
+    allowed = min(len(turns), TURNS_PER_ROUND * scenario.max_rounds)
+    for index in range(allowed):
         verdict = _judge_turn(scenario, turns, index)
         if verdict is not None:
             return verdict
