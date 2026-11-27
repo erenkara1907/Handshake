@@ -30,6 +30,7 @@ packages = ["src/handshake"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 addopts = "-m 'not smoke' --cov=handshake --cov-fail-under=80"
 markers = ["smoke: live-LLM smoke tests, excluded by default"]
